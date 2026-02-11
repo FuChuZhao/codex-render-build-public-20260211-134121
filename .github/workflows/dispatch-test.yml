@@ -1,0 +1,21 @@
+name: dispatch-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo_ssh:
+        description: source repo
+        required: true
+      source_ref:
+        description: source ref
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "repo=${{ inputs.source_repo_ssh }} ref=${{ inputs.source_ref }}"
