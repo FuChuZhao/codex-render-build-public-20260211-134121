@@ -25,7 +25,7 @@ on:
       wt_shells:
         description: "comma-separated shells for WT (pwsh,cmd)"
         required: true
-        default: "pwsh,cmd"
+        default: "pwsh"
       runs_on:
         description: "JSON array runner labels, e.g. [\"windows-latest\"] or [\"self-hosted\",\"Windows\",\"wt-interactive\"]"
         required: true
