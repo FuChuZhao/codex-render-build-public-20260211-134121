@@ -1,0 +1,58 @@
+name: render-visual-ubuntu-baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo_ssh:
+        description: "SSH URL to private source repo"
+        required: true
+      source_ref:
+        description: "source repo ref"
+        required: true
+        default: "main"
+      codex_ref:
+        description: "openai/codex ref/tag"
+        required: true
+        default: "rust-v0.98.0"
+      scenario:
+        description: "scenario name"
+        required: true
+        default: "high_throughput_render"
+      artifact_name:
+        description: "artifact base name"
+        required: true
+        default: "visual-ubuntu-baseline"
+
+permissions:
+  contents: read
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Clone source
+        shell: bash
+        run: |
+          GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Visual validation
+        shell: bash
+        run: |
+          cd source
+          ./tool/ci/run-cloud-visual-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.artifact_name }}-ubuntu
+          path: source/artifacts
+          retention-days: 1
