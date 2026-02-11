@@ -39,15 +39,10 @@ jobs:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
-      - name: Prepare known_hosts
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
       - name: Clone source
         shell: bash
         run: |
-          git clone "${{ inputs.source_repo_ssh }}" source
+          GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' git clone "${{ inputs.source_repo_ssh }}" source
           cd source
           git checkout "${{ inputs.source_ref }}"
       - name: Run validation
@@ -73,15 +68,10 @@ jobs:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
-      - name: Prepare known_hosts
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
       - name: Clone source
         shell: bash
         run: |
-          git clone "${{ inputs.source_repo_ssh }}" source
+          GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' git clone "${{ inputs.source_repo_ssh }}" source
           cd source
           git checkout "${{ inputs.source_ref }}"
       - name: Run validation
@@ -107,15 +97,10 @@ jobs:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
-      - name: Prepare known_hosts
-        shell: bash
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
       - name: Clone source
         shell: bash
         run: |
-          git clone "${{ inputs.source_repo_ssh }}" source
+          GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' git clone "${{ inputs.source_repo_ssh }}" source
           cd source
           git checkout "${{ inputs.source_ref }}"
       - name: Run validation
@@ -141,15 +126,10 @@ jobs:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
-      - name: Prepare known_hosts
-        shell: pwsh
-        run: |
-          $sshDir = Join-Path $HOME ".ssh"
-          New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
-          ssh-keyscan github.com | Out-File -FilePath (Join-Path $sshDir "known_hosts") -Append -Encoding ascii
       - name: Clone source
         shell: pwsh
         run: |
+          $env:GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=accept-new"
           git clone "${{ inputs.source_repo_ssh }}" source
           cd source
           git checkout "${{ inputs.source_ref }}"
@@ -176,15 +156,10 @@ jobs:
       - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
-      - name: Prepare known_hosts
-        shell: pwsh
-        run: |
-          $sshDir = Join-Path $HOME ".ssh"
-          New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
-          ssh-keyscan github.com | Out-File -FilePath (Join-Path $sshDir "known_hosts") -Append -Encoding ascii
       - name: Clone source
         shell: pwsh
         run: |
+          $env:GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=accept-new"
           git clone "${{ inputs.source_repo_ssh }}" source
           cd source
           git checkout "${{ inputs.source_ref }}"
