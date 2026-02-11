@@ -1,0 +1,114 @@
+name: env-probe-matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo_ssh:
+        description: "SSH URL to private source repo"
+        required: true
+      source_ref:
+        description: "source repo ref"
+        required: true
+        default: "main"
+      artifact_name:
+        description: "artifact base name"
+        required: true
+        default: "env-probe"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-bash
+            os: ubuntu-latest
+            shell_kind: bash
+            mode: unix
+          - name: ubuntu-pwsh
+            os: ubuntu-latest
+            shell_kind: pwsh
+            mode: unix
+          - name: macos-bash
+            os: macos-latest
+            shell_kind: bash
+            mode: unix
+          - name: windows-pwsh
+            os: windows-latest
+            shell_kind: pwsh
+            mode: windows
+          - name: windows-cmd
+            os: windows-latest
+            shell_kind: cmd
+            mode: windows
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure SSH deploy key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/id_ed25519 <<'KEY'
+${{ secrets.SOURCE_REPO_SSH_KEY }}
+KEY
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone private source repo
+        shell: bash
+        run: |
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git fetch --tags --prune
+          git checkout "${{ inputs.source_ref }}"
+
+      - name: Probe terminals (unix/bash)
+        if: matrix.mode == 'unix' && matrix.shell_kind == 'bash'
+        shell: bash
+        run: |
+          cd source
+          ./tool/ci/install-terminals.sh "$PWD/artifacts"
+
+      - name: Probe terminals (unix/pwsh)
+        if: matrix.mode == 'unix' && matrix.shell_kind == 'pwsh'
+        shell: pwsh
+        run: |
+          cd source
+          bash ./tool/ci/install-terminals.sh "$PWD/artifacts"
+
+      - name: Probe terminals (windows/pwsh)
+        if: matrix.mode == 'windows' && matrix.shell_kind == 'pwsh'
+        shell: pwsh
+        run: |
+          cd source
+          ./tool/ci/install-terminals.ps1 -ArtifactDir "artifacts"
+
+      - name: Probe terminals (windows/cmd)
+        if: matrix.mode == 'windows' && matrix.shell_kind == 'cmd'
+        shell: cmd
+        run: |
+          cd source
+          pwsh -File .\tool\ci\install-terminals.ps1 -ArtifactDir artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-${{ matrix.name }}
+          path: source/artifacts
+          retention-days: 1
