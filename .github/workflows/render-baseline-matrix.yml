@@ -27,100 +27,174 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ubuntu-bash
-            os: ubuntu-latest
-            shell_kind: bash
-            mode: unix
-          - name: ubuntu-pwsh
-            os: ubuntu-latest
-            shell_kind: pwsh
-            mode: unix
-          - name: macos-bash
-            os: macos-latest
-            shell_kind: bash
-            mode: unix
-          - name: windows-pwsh
-            os: windows-latest
-            shell_kind: pwsh
-            mode: windows
-          - name: windows-cmd
-            os: windows-latest
-            shell_kind: cmd
-            mode: windows
-
-    runs-on: ${{ matrix.os }}
+  ubuntu_bash:
+    runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
-      - name: Checkout build repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Configure SSH deploy key
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Prepare known_hosts
         shell: bash
         run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/id_ed25519 <<'KEY'
-${{ secrets.SOURCE_REPO_SSH_KEY }}
-KEY
-          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-      - name: Clone private source repo
+      - name: Clone source
         shell: bash
         run: |
           git clone "${{ inputs.source_repo_ssh }}" source
           cd source
-          git fetch --tags --prune
           git checkout "${{ inputs.source_ref }}"
-
-      - name: Run validation (unix/bash)
-        if: matrix.mode == 'unix' && matrix.shell_kind == 'bash'
+      - name: Run validation
         shell: bash
         run: |
           cd source
-          ./tool/ci/run-cloud-validation.sh \
-            --codex-ref "${{ inputs.codex_ref }}" \
-            --scenario "${{ inputs.scenario }}" \
-            --artifact-dir "$PWD/artifacts" \
-            --conservative-render false
+          ./tool/ci/run-cloud-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-ubuntu-bash
+          path: source/artifacts
+          retention-days: 1
 
-      - name: Run validation (unix/pwsh)
-        if: matrix.mode == 'unix' && matrix.shell_kind == 'pwsh'
+  ubuntu_pwsh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Prepare known_hosts
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Clone source
+        shell: bash
+        run: |
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Run validation
         shell: pwsh
         run: |
           cd source
           bash ./tool/ci/run-cloud-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-ubuntu-pwsh
+          path: source/artifacts
+          retention-days: 1
 
-      - name: Run validation (windows/pwsh)
-        if: matrix.mode == 'windows' && matrix.shell_kind == 'pwsh'
+  macos_bash:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Prepare known_hosts
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Clone source
+        shell: bash
+        run: |
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Run validation
+        shell: bash
+        run: |
+          cd source
+          ./tool/ci/run-cloud-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-macos-bash
+          path: source/artifacts
+          retention-days: 1
+
+  windows_pwsh:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Prepare known_hosts
+        shell: pwsh
+        run: |
+          $sshDir = Join-Path $HOME ".ssh"
+          New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
+          ssh-keyscan github.com | Out-File -FilePath (Join-Path $sshDir "known_hosts") -Append -Encoding ascii
+      - name: Clone source
+        shell: pwsh
+        run: |
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Run validation
         shell: pwsh
         run: |
           cd source
           ./tool/ci/run-cloud-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir "artifacts" -ConservativeRender:$false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}-windows-pwsh
+          path: source/artifacts
+          retention-days: 1
 
-      - name: Run validation (windows/cmd)
-        if: matrix.mode == 'windows' && matrix.shell_kind == 'cmd'
+  windows_cmd:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Prepare known_hosts
+        shell: pwsh
+        run: |
+          $sshDir = Join-Path $HOME ".ssh"
+          New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
+          ssh-keyscan github.com | Out-File -FilePath (Join-Path $sshDir "known_hosts") -Append -Encoding ascii
+      - name: Clone source
+        shell: pwsh
+        run: |
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Run validation
         shell: cmd
         run: |
           cd source
           pwsh -File .\tool\ci\run-cloud-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir artifacts -ConservativeRender:$false
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifact_name }}-${{ matrix.name }}
+          name: ${{ inputs.artifact_name }}-windows-cmd
           path: source/artifacts
           retention-days: 1
