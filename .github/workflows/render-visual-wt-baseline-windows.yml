@@ -1,0 +1,72 @@
+name: render-visual-wt-baseline-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo_ssh:
+        description: "SSH URL to private source repo"
+        required: true
+      source_ref:
+        description: "source repo ref"
+        required: true
+        default: "main"
+      codex_ref:
+        description: "openai/codex ref/tag"
+        required: true
+        default: "rust-v0.98.0"
+      scenario:
+        description: "scenario name"
+        required: true
+        default: "high_throughput_render"
+      artifact_name:
+        description: "artifact base name"
+        required: true
+        default: "visual-wt-baseline"
+      wt_shells:
+        description: "comma-separated shells for WT (pwsh,cmd)"
+        required: true
+        default: "pwsh,cmd"
+      runs_on:
+        description: "JSON array runner labels, e.g. [\"windows-latest\"] or [\"self-hosted\",\"Windows\",\"wt-interactive\"]"
+        required: true
+        default: '["windows-latest"]'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-wt:
+    runs-on: ${{ fromJson(inputs.runs_on) }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Clone source
+        shell: pwsh
+        run: |
+          $env:GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=accept-new"
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Ensure terminal dependencies
+        shell: pwsh
+        run: |
+          cd source
+          ./tool/ci/install-terminals.ps1 -ArtifactDir "artifacts"
+      - name: WT visual validation (baseline)
+        shell: pwsh
+        run: |
+          cd source
+          ./tool/ci/run-cloud-wt-visual-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir "artifacts" -ConservativeRender:$false -WtShells "${{ inputs.wt_shells }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.artifact_name }}-windows
+          path: source/artifacts
+          retention-days: 1
