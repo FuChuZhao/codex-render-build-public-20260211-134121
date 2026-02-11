@@ -22,6 +22,14 @@ on:
         description: "artifact base name"
         required: true
         default: "visual-ubuntu-patched"
+      window_cols:
+        description: "terminal columns"
+        required: true
+        default: "80"
+      window_rows:
+        description: "terminal rows"
+        required: true
+        default: "24"
 
 permissions:
   contents: read
@@ -49,7 +57,7 @@ jobs:
         shell: bash
         run: |
           cd source
-          ./tool/ci/run-cloud-visual-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render true
+          ./tool/ci/run-cloud-visual-validation.sh --codex-ref "${{ inputs.codex_ref }}" --scenario "${{ inputs.scenario }}" --artifact-dir "$PWD/artifacts" --conservative-render true --window-cols "${{ inputs.window_cols }}" --window-rows "${{ inputs.window_rows }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
