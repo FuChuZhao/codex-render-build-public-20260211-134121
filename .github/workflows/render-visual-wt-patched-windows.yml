@@ -26,6 +26,22 @@ on:
         description: "comma-separated shells for WT (pwsh,cmd)"
         required: true
         default: "pwsh"
+      environment_preset:
+        description: "runner env preset: runner-default|win11-manual-20260213"
+        required: true
+        default: "runner-default"
+      apply_wt_settings_preset:
+        description: "apply WT preset onto runner settings"
+        required: true
+        default: "false"
+      window_cols:
+        description: "console window columns (0 keeps default)"
+        required: true
+        default: "0"
+      window_rows:
+        description: "console window rows (0 keeps default)"
+        required: true
+        default: "0"
       runs_on:
         description: "JSON array runner labels, e.g. [\"windows-latest\"] or [\"self-hosted\",\"Windows\",\"wt-interactive\"]"
         required: true
@@ -63,7 +79,10 @@ jobs:
         shell: pwsh
         run: |
           cd source
-          ./tool/ci/run-cloud-wt-visual-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir "artifacts" -ConservativeRender:$true -WtShells "${{ inputs.wt_shells }}"
+          $applyPreset = [System.Convert]::ToBoolean("${{ inputs.apply_wt_settings_preset }}")
+          $windowCols = [int]"${{ inputs.window_cols }}"
+          $windowRows = [int]"${{ inputs.window_rows }}"
+          ./tool/ci/run-cloud-wt-visual-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir "artifacts" -ConservativeRender:$true -WtShells "${{ inputs.wt_shells }}" -EnvironmentPreset "${{ inputs.environment_preset }}" -ApplyWtSettingsPreset:$applyPreset -WindowCols $windowCols -WindowRows $windowRows
       - uses: actions/upload-artifact@v4
         if: always()
         with:
