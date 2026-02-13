@@ -1,0 +1,137 @@
+name: render-visual-wt-selfhosted-soak-windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_repo_ssh:
+        description: "SSH URL to private source repo"
+        required: true
+      source_ref:
+        description: "source repo ref"
+        required: true
+        default: "main"
+      codex_ref:
+        description: "openai/codex ref/tag"
+        required: true
+        default: "rust-v0.98.0"
+      conservative_render:
+        description: "enable conservative render patch"
+        required: true
+        default: "false"
+      scenario:
+        description: "scenario name"
+        required: true
+        default: "cjk_wide_burst"
+      artifact_name:
+        description: "artifact base name"
+        required: true
+        default: "visual-wt-selfhosted-soak"
+      wt_shells:
+        description: "comma-separated shells for WT (pwsh,cmd)"
+        required: true
+        default: "pwsh,cmd"
+      environment_preset:
+        description: "runner env preset: runner-default|win11-manual-20260213"
+        required: true
+        default: "win11-manual-20260213"
+      apply_wt_settings_preset:
+        description: "apply WT preset onto runner settings"
+        required: true
+        default: "true"
+      window_cols:
+        description: "console window columns"
+        required: true
+        default: "80"
+      window_rows:
+        description: "console window rows"
+        required: true
+        default: "24"
+      additional_frame_count:
+        description: "extra capture frames after start/mid/end"
+        required: true
+        default: "12"
+      additional_frame_interval_sec:
+        description: "seconds between extra frames"
+        required: true
+        default: "2"
+      enable_resize_stress:
+        description: "enable window resize stress between snapshots"
+        required: true
+        default: "true"
+      resize_stress_step_px:
+        description: "window resize stress pixel step"
+        required: true
+        default: "160"
+      enable_desktop_video_capture:
+        description: "capture desktop video via ffmpeg gdigrab"
+        required: true
+        default: "true"
+      desktop_video_fps:
+        description: "desktop capture fps"
+        required: true
+        default: "12"
+      desktop_video_duration_sec:
+        description: "desktop capture max duration"
+        required: true
+        default: "60"
+      desktop_video_sample_fps:
+        description: "sample fps for OCR frame extraction"
+        required: true
+        default: "1"
+      runs_on:
+        description: "JSON array runner labels"
+        required: true
+        default: '["self-hosted","Windows","wt-interactive"]'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-selfhosted-soak:
+    runs-on: ${{ fromJson(inputs.runs_on) }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOURCE_REPO_SSH_KEY }}
+      - name: Clone source
+        shell: pwsh
+        run: |
+          $env:GIT_SSH_COMMAND = "ssh -o StrictHostKeyChecking=accept-new"
+          git clone "${{ inputs.source_repo_ssh }}" source
+          cd source
+          git checkout "${{ inputs.source_ref }}"
+      - name: Ensure terminal dependencies
+        shell: pwsh
+        run: |
+          cd source
+          ./tool/ci/install-terminals.ps1 -ArtifactDir "artifacts"
+      - name: WT visual validation (self-hosted soak)
+        shell: pwsh
+        run: |
+          cd source
+          $applyPreset = [System.Convert]::ToBoolean("${{ inputs.apply_wt_settings_preset }}")
+          $conservativeRender = [System.Convert]::ToBoolean("${{ inputs.conservative_render }}")
+          $enableResizeStress = [System.Convert]::ToBoolean("${{ inputs.enable_resize_stress }}")
+          $enableDesktopVideoCapture = [System.Convert]::ToBoolean("${{ inputs.enable_desktop_video_capture }}")
+          $windowCols = [int]"${{ inputs.window_cols }}"
+          $windowRows = [int]"${{ inputs.window_rows }}"
+          $additionalFrameCount = [int]"${{ inputs.additional_frame_count }}"
+          $additionalFrameIntervalSec = [int]"${{ inputs.additional_frame_interval_sec }}"
+          $resizeStressStepPx = [int]"${{ inputs.resize_stress_step_px }}"
+          $desktopVideoFps = [int]"${{ inputs.desktop_video_fps }}"
+          $desktopVideoDurationSec = [int]"${{ inputs.desktop_video_duration_sec }}"
+          $desktopVideoSampleFps = [int]"${{ inputs.desktop_video_sample_fps }}"
+
+          ./tool/ci/run-cloud-wt-visual-validation.ps1 -CodexRef "${{ inputs.codex_ref }}" -Scenario "${{ inputs.scenario }}" -ArtifactDir "artifacts" -ConservativeRender:$conservativeRender -WtShells "${{ inputs.wt_shells }}" -EnvironmentPreset "${{ inputs.environment_preset }}" -ApplyWtSettingsPreset:$applyPreset -WindowCols $windowCols -WindowRows $windowRows -AdditionalFrameCount $additionalFrameCount -AdditionalFrameIntervalSec $additionalFrameIntervalSec -EnableResizeStress:$enableResizeStress -ResizeStressStepPx $resizeStressStepPx -EnableDesktopVideoCapture:$enableDesktopVideoCapture -DesktopVideoFps $desktopVideoFps -DesktopVideoDurationSec $desktopVideoDurationSec -DesktopVideoSampleFps $desktopVideoSampleFps
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.artifact_name }}-windows
+          path: source/artifacts
+          retention-days: 1
